@@ -221,6 +221,37 @@
             .domain(["positive", "negative"])
             .range(["blue", "red"]);
 
+        // Calculate and apply dynamic offsets for each point
+        const offsetStep = 15;
+        const offsetMap = new Map();
+
+        data.forEach(d => {
+            antibiotics.forEach(antibiotic => {
+                const key = `${d.Bacteria}`;
+                const value = d[antibiotic];
+                const existingGroup = offsetMap.get(value) || new Map();
+                const points = existingGroup.get(antibiotic) || [];
+                points.push(key);
+                existingGroup.set(antibiotic, points);
+                offsetMap.set(value, existingGroup);
+            });
+        });
+
+        // Add offset property to data
+        data.forEach(d => {
+            antibiotics.forEach(antibiotic => {
+                const value = d[antibiotic];
+                const points = offsetMap.get(value).get(antibiotic);
+                const index = points.indexOf(d.Bacteria);
+                const total = points.length;
+                let offset = 0;
+                if (total > 1) {
+                    offset = (index - (total - 1) / 2) * offsetStep;
+                }
+                d[`${antibiotic}Offset`] = offset;
+            });
+        });
+
         // Create a group for each bacterium
         const bacteriumGroup = svg.selectAll(".bacterium-group")
             .data(data)
@@ -230,16 +261,16 @@
 
         // Add the lines connecting the data points
         const lineGenerator = d3.line()
-            .x(d => xScale(d.antibiotic))
+            .x(d => xScale(d.antibiotic) + d.offset)
             .y(d => yScale(d.sensitivity));
 
         bacteriumGroup.append("path")
             .attr("class", "line")
             .attr("d", d => {
                 const lineData = [
-                    { antibiotic: "Penicilin", sensitivity: d.Penicilin },
-                    { antibiotic: "Streptomycin", sensitivity: d.Streptomycin },
-                    { antibiotic: "Neomycin", sensitivity: d.Neomycin }
+                    { antibiotic: "Penicilin", sensitivity: d.Penicilin, offset: d.PenicilinOffset },
+                    { antibiotic: "Streptomycin", sensitivity: d.Streptomycin, offset: d.StreptomycinOffset },
+                    { antibiotic: "Neomycin", sensitivity: d.Neomycin, offset: d.NeomycinOffset }
                 ];
                 return lineGenerator(lineData);
             });
@@ -248,14 +279,14 @@
         const dots = bacteriumGroup.selectAll(".dot")
             .data(d => {
                 return [
-                    { bacteria: d.Bacteria, gram: d['Gram Staining'], antibiotic: "Penicilin", sensitivity: d.Penicilin },
-                    { bacteria: d.Bacteria, gram: d['Gram Staining'], antibiotic: "Streptomycin", sensitivity: d.Streptomycin },
-                    { bacteria: d.Bacteria, gram: d['Gram Staining'], antibiotic: "Neomycin", sensitivity: d.Neomycin }
+                    { bacteria: d.Bacteria, gram: d['Gram Staining'], antibiotic: "Penicilin", sensitivity: d.Penicilin, offset: d.PenicilinOffset },
+                    { bacteria: d.Bacteria, gram: d['Gram Staining'], antibiotic: "Streptomycin", sensitivity: d.Streptomycin, offset: d.StreptomycinOffset },
+                    { bacteria: d.Bacteria, gram: d['Gram Staining'], antibiotic: "Neomycin", sensitivity: d.Neomycin, offset: d.NeomycinOffset }
                 ];
             })
             .join("circle")
             .attr("class", "dot")
-            .attr("cx", d => xScale(d.antibiotic))
+            .attr("cx", d => xScale(d.antibiotic) + d.offset)
             .attr("cy", d => yScale(d.sensitivity))
             .attr("r", 5)
             .attr("fill", d => colorScale(d.gram));
@@ -289,11 +320,15 @@
             tooltip.style("display", "block").html(tooltipContent);
             
             if (isButtonHover) {
-                // Position tooltip in the middle of the chart
+                // Position tooltip over the center data point
+                const centerDataPoint = activeGroup.selectAll(".dot").filter((d, i) => i === 1).node();
+                const bbox = centerDataPoint.getBoundingClientRect();
                 const plotRect = plotDiv.node().getBoundingClientRect();
-                const middleX = plotRect.left + plotRect.width / 2;
-                const middleY = plotRect.top + plotRect.height / 2;
-                tooltip.style("left", `${middleX}px`).style("top", `${middleY}px`);
+                
+                const tooltipX = bbox.x - plotRect.x + bbox.width / 2;
+                const tooltipY = bbox.y - plotRect.y + bbox.height / 2;
+
+                tooltip.style("left", `${tooltipX}px`).style("top", `${tooltipY}px`);
             } else {
                 // Position tooltip next to the dot
                 tooltip.style("left", `${event.pageX + 10}px`).style("top", `${event.pageY - 20}px`);
