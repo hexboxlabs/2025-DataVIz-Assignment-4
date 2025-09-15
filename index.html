@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Antibiotic Sensitivity Analysis</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.26.0/plotly.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        #plot {
+            width: 100%;
+            height: 600px;
+        }
+        .info {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Antibiotic Sensitivity Comparison</h1>
+        <div id="plot"></div>
+        <div class="info">
+            <p><strong>Note:</strong> This visualization shows antibiotic sensitivity data on a logarithmic scale. 
+            Lower values indicate higher sensitivity (more effective treatment). The data is colored by Gram staining results:
+            <span style="color: blue;">■</span> Gram-positive bacteria and 
+            <span style="color: red;">■</span> Gram-negative bacteria.</p>
+        </div>
+    </div>
+
+    <script>
+        // Sample antibiotic sensitivity data (mimicking the original dataset)
+        const data = [
+            {Bacteria: "Aerobacter aerogenes", "Gram Staining": "negative", Penicilin: 870, Streptomycin: 1, Neomycin: 1.6},
+            {Bacteria: "Brucella abortus", "Gram Staining": "negative", Penicilin: 1, Streptomycin: 2, Neomycin: 0.02},
+            {Bacteria: "Brucella anthracis", "Gram Staining": "positive", Penicilin: 0.001, Streptomycin: 0.01, Neomycin: 0.007},
+            {Bacteria: "Diplococcus pneumonia", "Gram Staining": "positive", Penicilin: 0.005, Streptomycin: 11, Neomycin: 10},
+            {Bacteria: "Escherichia coli", "Gram Staining": "negative", Penicilin: 100, Streptomycin: 0.4, Neomycin: 0.1},
+            {Bacteria: "Klebsiella pneumoniae", "Gram Staining": "negative", Penicilin: 850, Streptomycin: 1.2, Neomycin: 1},
+            {Bacteria: "Mycobacterium tuberculosis", "Gram Staining": "negative", Penicilin: 800, Streptomycin: 5, Neomycin: 2},
+            {Bacteria: "Proteus vulgaris", "Gram Staining": "negative", Penicilin: 3, Streptomycin: 0.1, Neomycin: 0.1},
+            {Bacteria: "Pseudomonas aeruginosa", "Gram Staining": "negative", Penicilin: 850, Streptomycin: 2, Neomycin: 0.4},
+            {Bacteria: "Salmonella (Eberthella) typhosa", "Gram Staining": "negative", Penicilin: 1, Streptomycin: 0.4, Neomycin: 0.008},
+            {Bacteria: "Salmonella schottmuelleri", "Gram Staining": "negative", Penicilin: 10, Streptomycin: 0.8, Neomycin: 0.09},
+            {Bacteria: "Staphylococcus albus", "Gram Staining": "positive", Penicilin: 0.007, Streptomycin: 0.1, Neomycin: 0.001},
+            {Bacteria: "Staphylococcus aureus", "Gram Staining": "positive", Penicilin: 0.03, Streptomycin: 0.03, Neomycin: 0.001},
+            {Bacteria: "Streptococcus fecalis", "Gram Staining": "positive", Penicilin: 1, Streptomycin: 1, Neomycin: 0.1},
+            {Bacteria: "Streptococcus hemolyticus", "Gram Staining": "positive", Penicilin: 0.001, Streptomycin: 0.01, Neomycin: 0.001},
+            {Bacteria: "Streptococcus viridans", "Gram Staining": "positive", Penicilin: 0.005, Streptomycin: 0.1, Neomycin: 0.005}
+        ];
+
+        // Reshape data to long format (similar to pandas melt)
+        const meltedData = [];
+        data.forEach(row => {
+            ['Penicilin', 'Streptomycin', 'Neomycin'].forEach(antibiotic => {
+                meltedData.push({
+                    Bacteria: row.Bacteria,
+                    'Gram Staining': row['Gram Staining'],
+                    Antibiotic: antibiotic,
+                    Sensitivity: row[antibiotic]
+                });
+            });
+        });
+
+        // Separate data by Gram staining for different traces
+        const positiveData = meltedData.filter(d => d['Gram Staining'] === 'positive');
+        const negativeData = meltedData.filter(d => d['Gram Staining'] === 'negative');
+
+        // Create traces for positive and negative bacteria
+        const trace1 = {
+            x: positiveData.map(d => d.Antibiotic),
+            y: positiveData.map(d => d.Sensitivity),
+            text: positiveData.map(d => d.Bacteria),
+            mode: 'markers',
+            type: 'scatter',
+            name: 'Gram-positive',
+            marker: {
+                color: 'blue',
+                size: 8,
+                opacity: 0.7
+            },
+            hovertemplate: '<b>%{text}</b><br>' +
+                          'Antibiotic: %{x}<br>' +
+                          'Sensitivity: %{y}<br>' +
+                          '<extra></extra>'
+        };
+
+        const trace2 = {
+            x: negativeData.map(d => d.Antibiotic),
+            y: negativeData.map(d => d.Sensitivity),
+            text: negativeData.map(d => d.Bacteria),
+            mode: 'markers',
+            type: 'scatter',
+            name: 'Gram-negative',
+            marker: {
+                color: 'red',
+                size: 8,
+                opacity: 0.7
+            },
+            hovertemplate: '<b>%{text}</b><br>' +
+                          'Antibiotic: %{x}<br>' +
+                          'Sensitivity: %{y}<br>' +
+                          '<extra></extra>'
+        };
+
+        // Layout configuration
+        const layout = {
+            title: {
+                text: 'Antibiotic Sensitivity Comparison (Log Scale)',
+                font: {
+                    size: 18,
+                    color: '#333'
+                }
+            },
+            xaxis: {
+                title: 'Antibiotic Type',
+                showgrid: true,
+                gridcolor: '#e0e0e0'
+            },
+            yaxis: {
+                title: 'Sensitivity Value (Log Scale - Lower values = more sensitive)',
+                type: 'log',
+                showgrid: true,
+                gridcolor: '#e0e0e0'
+            },
+            plot_bgcolor: 'white',
+            paper_bgcolor: 'white',
+            legend: {
+                title: {
+                    text: 'Gram Staining'
+                },
+                x: 400.02,
+                y: 0.98,
+                bgcolor: 'rgba(255,255,255,0.8)',
+                bordercolor: '#ccc',
+                borderwidth: 1
+            },
+            hovermode: 'closest',
+            margin: {
+                l: 80,
+                r: 20,
+                t: 80,
+                b: 80
+            }
+        };
+
+        // Create the plot
+        Plotly.newPlot('plot', [trace1, trace2], layout, {
+            responsive: true,
+            displayModeBar: true,
+            modeBarButtonsToRemove: ['pan2d', 'lasso2d']
+        });
+    </script>
+</body>
+</html>
