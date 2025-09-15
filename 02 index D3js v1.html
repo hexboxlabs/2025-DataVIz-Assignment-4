@@ -46,7 +46,6 @@
             stroke: #666;
             stroke-width: 2;
             opacity: 0;
-            pointer-events: none;
         }
         .dot {
             fill-opacity: 0.7;
@@ -73,49 +72,18 @@
             line-height: 1.5;
             display: none;
         }
-        #buttons-container {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 10px;
-            margin-top: 20px;
-        }
-        .bacterium-button {
-            padding: 8px 12px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 12px;
-            transition: background-color 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
-            color: white;
-            opacity: 1;
-        }
-        .bacterium-button:hover,
-        .bacterium-button.active {
-            filter: brightness(1.2);
-            transform: translateY(-2px);
-            opacity: 1;
-        }
-        .bacterium-button.dimmed {
-            opacity: 0.5;
-        }
-        .gram-positive {
-            background-color: blue;
-        }
-        .gram-negative {
-            background-color: red;
-        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Antibiotic Sensitivity Comparison</h1>
-        <div style ="margin-left:225px">
-            <p><span style="color: blue;">■</span> Gram-positive bacteria <span style="color: red;">■</span> Gram-negative bacteria.</p>
+        <div >
+            <p><span style="color: blue;">■</span> Gram-positive bacteria and <span style="color: red;">■</span> Gram-negative bacteria.</p>
+            <p><strong>Note:</strong> Hover over any data point to see a line connecting all three antibiotic data points for that bacterium, along with a custom tooltip displaying all three values. </p>
         </div>
         <div id="plot"></div>
         <div id="tooltip"></div>
-        <div id="buttons-container"></div>
+        
     </div>
 
     <script>
@@ -141,11 +109,10 @@
 
         const plotDiv = d3.select("#plot");
         const tooltip = d3.select("#tooltip");
-        const buttonsContainer = d3.select("#buttons-container");
 
         const margin = {top: 50, right: 50, bottom: 50, left: 100};
         const width = 800;
-        const height = 600;
+        const height = 500;
 
         // Append SVG to the div
         const svg = plotDiv.append("svg")
@@ -214,7 +181,7 @@
             .attr("x", -height / 2)
             .attr("dy", "1em")
             .attr("text-anchor", "middle")
-            .text("Sensitivity Value (Lower is Better)");
+            .text("Sensitivity Value (Log Scale)");
 
         // Color scale for Gram staining
         const colorScale = d3.scaleOrdinal()
@@ -225,8 +192,7 @@
         const bacteriumGroup = svg.selectAll(".bacterium-group")
             .data(data)
             .join("g")
-            .attr("class", "bacterium-group")
-            .attr("id", d => `group-${d.Bacteria.replace(/[^a-zA-Z0-9]/g, '')}`); // Add unique ID
+            .attr("class", "bacterium-group");
 
         // Add the lines connecting the data points
         const lineGenerator = d3.line()
@@ -260,63 +226,26 @@
             .attr("r", 5)
             .attr("fill", d => colorScale(d.gram));
 
-        // Create bacterium buttons
-        const buttons = buttonsContainer.selectAll(".bacterium-button")
-            .data(data)
-            .join("button")
-            .attr("class", d => `bacterium-button ${d['Gram Staining'] === 'positive' ? 'gram-positive' : 'gram-negative'}`)
-            .text(d => d.Bacteria)
-            .attr("data-bacteria", d => d.Bacteria.replace(/[^a-zA-Z0-9]/g, ''));
+        // Interaction logic
+        bacteriumGroup.on("mouseover", function(event, d) {
+            d3.select(this).select(".line").classed("hover-line", true);
+            d3.select(this).selectAll(".dot").transition().duration(200).attr("r", 8);
 
-        // Define hover logic for both dots and buttons
-        function handleHover(bacteriaName, event, isButtonHover = false) {
-            d3.selectAll(".bacterium-group").classed("active", false).style("opacity", 0.3);
-            d3.selectAll(".bacterium-button").classed("active", false).classed("dimmed", true);
-
-            const activeGroup = d3.select(`#group-${bacteriaName.replace(/[^a-zA-Z0-9]/g, '')}`);
-            activeGroup.classed("active", true).style("opacity", 1);
-            activeGroup.select(".line").classed("hover-line", true);
-            activeGroup.selectAll(".dot").transition().duration(200).attr("r", 8);
-
-            d3.select(`[data-bacteria="${bacteriaName.replace(/[^a-zA-Z0-9]/g, '')}"]`).classed("active", true).classed("dimmed", false);
-
-            const fullData = data.find(item => item.Bacteria === bacteriaName);
-            const tooltipContent = `<b>${fullData.Bacteria}</b> (${fullData['Gram Staining']})\n\n` +
-                                 `Penicilin: ${fullData.Penicilin}\n` +
-                                 `Streptomycin: ${fullData.Streptomycin}\n` +
-                                 `Neomycin: ${fullData.Neomycin}`;
+            const tooltipContent = `<b>${d.Bacteria}</b> (${d['Gram Staining']})\n\n` +
+                                 `Penicilin: ${d.Penicilin}\n` +
+                                 `Streptomycin: ${d.Streptomycin}\n` +
+                                 `Neomycin: ${d.Neomycin}`;
             
-            tooltip.style("display", "block").html(tooltipContent);
-            
-            if (isButtonHover) {
-                // Position tooltip in the middle of the chart
-                const plotRect = plotDiv.node().getBoundingClientRect();
-                const middleX = plotRect.left + plotRect.width / 2;
-                const middleY = plotRect.top + plotRect.height / 2;
-                tooltip.style("left", `${middleX}px`).style("top", `${middleY}px`);
-            } else {
-                // Position tooltip next to the dot
-                tooltip.style("left", `${event.pageX + 10}px`).style("top", `${event.pageY - 20}px`);
-            }
-        }
-
-        function handleMouseout() {
-            d3.selectAll(".bacterium-group").classed("active", false).style("opacity", 1);
-            d3.selectAll(".bacterium-button").classed("active", false).classed("dimmed", false);
-            d3.selectAll(".line").classed("hover-line", false);
-            d3.selectAll(".dot").transition().duration(200).attr("r", 5);
+            tooltip.style("display", "block")
+                   .html(tooltipContent)
+                   .style("left", `${event.pageX + 10}px`)
+                   .style("top", `${event.pageY - 20}px`);
+        })
+        .on("mouseout", function() {
+            d3.select(this).select(".line").classed("hover-line", false);
+            d3.select(this).selectAll(".dot").transition().duration(200).attr("r", 5);
             tooltip.style("display", "none");
-        }
-
-        // Add hover listeners to dots
-        dots.on("mouseover", function(event, d) {
-            handleHover(d.bacteria, event, false);
-        }).on("mouseout", handleMouseout);
-
-        // Add hover listeners to buttons
-        buttons.on("mouseover", function(event, d) {
-            handleHover(d.Bacteria, event, true);
-        }).on("mouseout", handleMouseout);
+        });
 
     </script>
 </body>
